@@ -3,12 +3,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Royal Show">
 <meta name="theme-color" content="#b3122e"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon.svg">
 <title>Perth Royal Show – Today</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://tile.openstreetmap.org"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 *{box-sizing:border-box}html,body{margin:0;height:100%;font-family:-apple-system,system-ui,sans-serif;background:#f4f4f6;color:#1c1c1e}
 header{background:#b3122e;color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px}
 header h1{margin:0;font-size:19px}header .sub{font-size:13px;opacity:.9}
-.banner{background:#fff3cd;color:#664d03;font-size:12px;padding:6px 16px}
+.banner{display:none}
 main{position:absolute;top:var(--top,100px);bottom:calc(64px + env(safe-area-inset-bottom));left:0;right:0;overflow:auto}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid #ddd;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;height:64px;border:0;background:none;font-size:13px;color:#666}nav button b{display:block;font-size:22px}
@@ -27,7 +27,7 @@ input[type=search],select{width:100%;font-size:17px;padding:12px;border:1px soli
 label{display:block;font-weight:600;margin:14px 2px 6px}
 .big{display:block;width:100%;font-size:17px;padding:15px;border:0;border-radius:14px;background:#b3122e;color:#fff;font-weight:600;margin-top:16px}
 .big.alt{background:#fff;color:#b3122e;border:2px solid #b3122e}
-#map{flex:1;min-height:200px}
+#map{flex:1;min-height:200px}.warn{background:#fff3cd;color:#664d03;border-radius:10px;padding:8px 10px;font-size:13px;margin-bottom:8px}#hintsbox ol{max-height:22vh;overflow:auto}
 .panel{background:#fff;padding:12px 14px;border-top:1px solid #ddd}
 .dir{display:flex;align-items:center;gap:14px}
 #arrow{width:64px;height:64px;flex:none;transition:transform .2s}
@@ -37,7 +37,7 @@ label{display:block;font-weight:600;margin:14px 2px 6px}
 .note{font-size:12px;color:#777;margin-top:8px}
 </style></head><body>
 <header><h1>🎡 Perth Royal Show – Today</h1><div class="sub" id="clock">Sat 3 Oct 2026 · Claremont Showground</div></header>
-<div class="banner" id="banner">Preview build: event list is real (RAS website); some locations are SAMPLE / approx.</div>
+<div class="banner" id="banner"></div>
 <main id="main">
 <section class="view on" id="v-events">
  <input type="search" id="q" placeholder="Search events or venues…">
@@ -49,15 +49,15 @@ label{display:block;font-weight:600;margin:14px 2px 6px}
  <label for="dst">To</label><select id="dst"></select>
  <button class="big" id="swap" style="background:#555">⇅ Swap</button>
  <button class="big" id="showroute">Show route on map</button>
- <p class="note">Tip: tap “Go here” on any event to set it as your destination. Locations marked (approx.) are not exact.</p>
+ <p class="note">Tip: tap “Go here” on any event to set it as your destination. Walking routes follow OpenStreetMap footpaths inside the showground.</p><p class="note">Locations from RAS venue data, OpenStreetMap and the <a id="mappdf" href="#" target="_blank" rel="noopener">official 2026 show map (PDF)</a>. Event times from raswa.org.au (3 Oct). Roads/paths may be closed by show set-up – follow signage.</p>
 </section>
 <section class="view" id="v-map">
  <div id="map"></div>
- <div class="panel">
+ <div class="panel"><div class="warn" id="warn" style="display:none"></div>
   <div class="dir"><svg id="arrow" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#eef"/><path d="M32 6 L46 44 L32 36 L18 44 Z" fill="#2238a8"/></svg>
    <div><div class="txt" id="dirtxt">Choose a destination</div><div class="s" id="dirsub"></div></div></div>
   <div class="row"><button id="compass" class="alt">🧭 Use compass</button><a id="gmaps" href="#" target="_blank" rel="noopener">Google Maps walk</a></div>
-  <div class="note" id="gpsnote">GPS: waiting…</div>
+  <div class="note" id="gpsnote">GPS: waiting…</div><details id="hintsbox" style="display:none"><summary class="note" style="font-size:14px;color:#2238a8;font-weight:600">Step-by-step</summary><ol id="hints" style="margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5"></ol></details>
  </div>
 </section>
 </main>
@@ -87,53 +87,91 @@ function renderList(){const q=$('#q').value.toLowerCase(),now=perthNow();
   const l=e.venueId&&loc(e.venueId);
   h+=`<div class="ev ${st.s}"><div class="t">${st.s==='now'?'<span class="badge b-now">NOW</span>':st.s==='next'?'<span class="badge b-next">SOON</span>':''}${esc(e.title)}</div>
   <div class="m">🕒 ${e.sessions.map(s=>fmt(s.start)+'–'+fmt(s.end)).join(', ')}</div>
-  <div class="m">📍 ${esc(l?lname(l):e.venue+(e.venue==='TBA'?'':' (location unknown)'))}${e.free?' · Free':''}</div>
+  <div class="m">📍 ${esc(l?lname(l):e.roving?'Roving – no fixed spot':e.venue)}${e.free?' · Free':''}</div>
   ${l?`<button class="go" data-id="${esc(l.id)}">➜ Go here</button>`:''}</div>`}
  $('#list').innerHTML=h||'<p>No matching events.</p>'}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function fillSelects(){const groups={venue:'Venues & pavilions',gate:'Gates',station:'Train',toilet:'Toilets',food:'Food',parking:'Parking'};
+function fillSelects(){const groups={venue:'Venues & pavilions',ride:'Rides & Sideshow Alley',gate:'Gates',station:'Train',toilet:'Toilets',food:'Food',parking:'Parking'};
  const opts=Object.entries(groups).map(([t,n])=>`<optgroup label="${n}">`+D.locations.filter(l=>l.type===t).sort((a,b)=>a.name.localeCompare(b.name)).map(l=>`<option value="${esc(l.id)}">${esc(lname(l))}</option>`).join('')+'</optgroup>').join('');
  $('#src').innerHTML='<option value="__gps">📡 My current location (GPS)</option>'+opts;$('#dst').innerHTML='<option value="">— choose destination —</option>'+opts}
-function show(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='map'){initMap();setTimeout(()=>{map.invalidateSize();update(true)},50)}}
+function show(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='map'){initMap();setTimeout(()=>{map.invalidateSize();lastGpsKey='';update(true)},50)}}
 function initMap(){if(map)return;map=L.map('map',{zoomControl:true}).setView([-31.9750,115.7855],17);
- L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
- D.locations.forEach(l=>L.circleMarker([l.lat,l.lng],{radius:5,color:l.approx?'#f0a000':'#b3122e',weight:2,fillOpacity:.6}).addTo(map).bindPopup(esc(lname(l))+`<br><a href="#" onclick="setDst('${l.id.replace(/'/g,"\\'")}');return false">Go here</a>`));drawGPS()}
+ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+ const COL={venue:'#b3122e',ride:'#8a2be2',gate:'#0a7d32',station:'#0057b8',toilet:'#00838f',food:'#e07000',parking:'#555'};D.locations.forEach(l=>L.circleMarker([l.lat,l.lng],{radius:l.type==='venue'?5:6,color:COL[l.type]||'#b3122e',weight:2,fillOpacity:.6}).addTo(map).bindPopup(esc(lname(l))+`<br><a href="#" onclick="setDst('${l.id.replace(/'/g,"\\'")}');return false">Go here</a>`));drawGPS()}
 function srcPt(){const v=$('#src').value;if(v==='__gps')return gps?{lat:gps.lat,lng:gps.lng,name:'You'}:null;const l=loc(v);return l&&{lat:l.lat,lng:l.lng,name:lname(l)}}
 function dstPt(){const l=loc($('#dst').value);return l&&{lat:l.lat,lng:l.lng,name:lname(l)}}
 const R=6371000,rad=x=>x*Math.PI/180;
 function dist(a,b){const dl=rad(b.lat-a.lat),dn=rad(b.lng-a.lng),h=Math.sin(dl/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 function bearing(a,b){const y=Math.sin(rad(b.lng-a.lng))*Math.cos(rad(b.lat)),x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lng-a.lng));return(Math.atan2(y,x)*180/Math.PI+360)%360}
 const card=b=>['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b/45)%8];
-function update(fit){if(!map)return;const a=srcPt(),b=dstPt();
- [srcM,dstM,line].forEach(m=>m&&map.removeLayer(m));srcM=dstM=line=null;
+let G=null,RT=null,routeL=null,legL=null,lastGpsKey='';
+const PUBLIC_GATES=['Gate 1 (Graylands Rd)','Gate 10 (Ashton Ave)','Station Gate (Showgrounds station)'];
+const fmtD=d=>d<1000?Math.max(10,Math.round(d/10)*10)+' m':(d/1000).toFixed(1)+' km';
+function inFence(p){const P=G&&G.fence;if(!P)return true;let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const[a,b]=P[i],[e,f]=P[j];if(((b>p.lng)!=(f>p.lng))&&(p.lat<(e-a)*(p.lng-b)/(f-b)+a))c=!c}return c}
+function nearest(p){let bi=-1,bd=1e9;const k=Math.cos(rad(p.lat));G.pts.forEach(([la,ln],i)=>{const d=(la-p.lat)**2+((ln-p.lng)*k)**2;if(d<bd){bd=d;bi=i}});return bi}
+function hpush(h,x){h.push(x);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p][0]<=h[i][0])break;[h[p],h[i]]=[h[i],h[p]];i=p}}
+function hpop(h){const top=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=a+1,m=i;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===i)break;[h[m],h[i]]=[h[i],h[m]];i=m}}return top}
+function astar(s,t){const n=G.pts.length,dd=new Float64Array(n).fill(Infinity),pr=new Int32Array(n).fill(-1),pk=new Int32Array(n).fill(-1),T={lat:G.pts[t][0],lng:G.pts[t][1]};
+ const hz=i=>dist({lat:G.pts[i][0],lng:G.pts[i][1]},T);dd[s]=0;const h=[[hz(s),s]];
+ while(h.length){const[,u]=hpop(h);if(u===t)break;const du=dd[u];for(const[v,w,k]of G.adj[u]){const nd=du+w;if(nd<dd[v]){dd[v]=nd;pr[v]=u;pk[v]=k;hpush(h,[nd+hz(v),v])}}}
+ if(dd[t]===Infinity)return null;const path=[];for(let v=t;v!==-1;v=pr[v])path.push(v);path.reverse();return{path,pk}}
+function turnWord(a){a=((a+540)%360)-180;if(Math.abs(a)<30)return'Continue';if(Math.abs(a)>150)return'Turn around';return(a>0?(a>100?'Sharp right':'Turn right'):(a<-100?'Sharp left':'Turn left'))}
+function buildRoute(A,B){if(!G)return null;const sa=nearest(A),sb=nearest(B);const pa={lat:G.pts[sa][0],lng:G.pts[sa][1]},pb={lat:G.pts[sb][0],lng:G.pts[sb][1]};
+ if(dist(A,pa)>200||dist(B,pb)>200)return null;const r=sa===sb?{path:[sa],pk:[]}:astar(sa,sb);if(!r)return null;
+ const pts=[A,...r.path.map(i=>({lat:G.pts[i][0],lng:G.pts[i][1]})),B];let len=0;for(let i=1;i<pts.length;i++)len+=dist(pts[i-1],pts[i]);
+ // hints: group by street name
+ const segs=[];for(let i=1;i<r.path.length;i++){const u=r.path[i-1],v=r.path[i],a={lat:G.pts[u][0],lng:G.pts[u][1]},b={lat:G.pts[v][0],lng:G.pts[v][1]},nm=G.names[r.pk[v]],d=dist(a,b),br=bearing(a,b);
+  const last=segs[segs.length-1];if(last&&(last.nm===nm||d<8)){last.d+=d;last.endBr=br}else segs.push({nm,d,br,endBr:br})}
+ const merged=[];for(const s of segs){const l=merged[merged.length-1];if(l&&s.d<15){l.d+=s.d;l.endBr=s.endBr}else merged.push(s)}
+ const hints=[];merged.forEach((s,i)=>{const on=/footpath|path|road|walkway|steps/.test(s.nm)?'the '+s.nm:s.nm;
+  hints.push(i===0?`Head ${card(s.br)} along ${on} – ${fmtD(s.d)}`:`${turnWord(s.br-merged[i-1].endBr)} onto ${on} – ${fmtD(s.d)}`)});
+ return{pts,len,hints}}
+function routeKey(){return $('#src').value+'|'+$('#dst').value+'|'+(gps&&$('#src').value==='__gps'?gps.lat.toFixed(5)+','+gps.lng.toFixed(5):'')}
+function update(fit){if(!map)return;const k=routeKey();if(!fit&&k===lastGpsKey){drawArrow();return}lastGpsKey=k;
+ let a=srcPt();const b=dstPt();[srcM,dstM,routeL,legL].forEach(m=>m&&map.removeLayer(m));srcM=dstM=routeL=legL=null;RT=null;
+ $('#warn').style.display='none';$('#hintsbox').style.display='none';
  if(a&&$('#src').value!=='__gps')srcM=L.marker([a.lat,a.lng],{title:'From'}).addTo(map).bindTooltip('From: '+esc(a.name));
  if(b)dstM=L.marker([b.lat,b.lng],{title:'To'}).addTo(map).bindTooltip('To: '+esc(b.name),{permanent:true,direction:'top'});
- if(a&&b){line=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#2238a8',weight:5,dashArray:'8 8'}).addTo(map);
-  const d=dist(a,b),br=bearing(a,b),mins=Math.max(1,Math.round(d/1.25/60));
-  $('#dirtxt').textContent=d<15?'You have arrived 🎉':`Head ${card(br)}, about ${d<1000?Math.round(d/10)*10+' m':(d/1000).toFixed(1)+' km'}`;
-  $('#dirsub').textContent=`~${mins} min walk · to ${b.name} · straight line`;
-  $('#arrow').style.transform=`rotate(${heading==null?br:br-heading}deg)`;
-  $('#gmaps').href=`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}&travelmode=walking`;
-  if(fit)map.fitBounds(line.getBounds(),{padding:[50,50],maxZoom:18})}
- else{$('#dirtxt').textContent=b?'Waiting for your GPS location…':'Choose a destination';$('#dirsub').textContent=b?'Or pick a starting point under From / To':'';$('#gmaps').href=b?`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=walking`:'#'}}
-function setDst(id){$('#dst').value=id;show('map')}
+ if(!(a&&b)){$('#dirtxt').textContent=b?'Waiting for your GPS location…':'Choose a destination';$('#dirsub').textContent=b?'Allow location access, or pick a starting point under From / To':'Tap an event’s “Go here”, or use From / To';$('#gmaps').href=b?`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=walking`:'#';drawArrow();return}
+ let gate=null,start=a;const gmTo=b;
+ if($('#src').value==='__gps'&&G&&!inFence(a)){gate=PUBLIC_GATES.map(loc).filter(Boolean).sort((x,y)=>dist(a,x)+dist(x,b)-dist(a,y)-dist(y,b))[0];start={lat:gate.lat,lng:gate.lng,name:gate.name};
+  legL=L.polyline([[a.lat,a.lng],[gate.lat,gate.lng]],{color:'#888',weight:4,dashArray:'4 8'}).addTo(map);
+  $('#warn').innerHTML=`You’re outside the showground, ${fmtD(dist(a,gate))} from <b>${esc(gate.name)}</b>. Use Google Maps to get to the gate, then follow the blue route inside.`;$('#warn').style.display='block'}
+ RT=buildRoute(start,b);const total=(RT?RT.len:dist(start,b));
+ if(RT){routeL=L.polyline(RT.pts.map(p=>[p.lat,p.lng]),{color:'#2238a8',weight:6,opacity:.9}).addTo(map);
+  $('#hints').innerHTML=RT.hints.map(h=>`<li>${esc(h)}</li>`).join('')+`<li>Arrive at ${esc(b.name)}</li>`;$('#hintsbox').style.display='block'}
+ else routeL=L.polyline([[start.lat,start.lng],[b.lat,b.lng]],{color:'#2238a8',weight:5,dashArray:'8 8'}).addTo(map);
+ const mins=Math.max(1,Math.round(total/1.2/60));
+ $('#dirsub').textContent=`${fmtD(total)} · ~${mins} min walk${gate?' from the gate':''} · ${RT?'footpath route':'straight line (no path data)'} · to ${b.name}`;
+ $('#gmaps').href=`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${(gate||gmTo).lat},${(gate||gmTo).lng}&travelmode=walking`;
+ $('#gmaps').textContent=gate?'Google Maps to gate':'Google Maps walk';
+ drawArrow();if(fit){const grp=L.featureGroup([routeL,...(legL?[legL]:[])]);map.fitBounds(grp.getBounds(),{padding:[40,40],maxZoom:18})}}
+function nextTarget(){const a=srcPt(),b=dstPt();if(!a||!b)return null;if(legL){const g=legL.getLatLngs()[1];return{from:a,to:{lat:g.lat,lng:g.lng}}}
+ if(RT){for(let i=1;i<RT.pts.length;i++)if(dist(a,RT.pts[i])>15)return{from:a,to:RT.pts[i]};}return{from:a,to:b}}
+function drawArrow(){const t=nextTarget();if(!t){$('#arrow').style.transform='';return}const d=dist(t.from,dstPt());
+ if(d<20&&!legL){$('#dirtxt').textContent='You have arrived 🎉';return}
+ const br=bearing(t.from,t.to);$('#dirtxt').textContent=legL?`Head ${card(br)} to the gate`:`Head ${card(br)} – ${fmtD(RT?RT.len:d)} to go`;
+ $('#arrow').style.transform=`rotate(${heading==null?br:br-heading}deg)`}
+
+function setDst(id){$('#dst').value=id;lastGpsKey='';show('map')}
 window.setDst=setDst;
 function startGPS(){if(!navigator.geolocation){$('#gpsnote').textContent='GPS not available';return}
  navigator.geolocation.watchPosition(p=>{gps={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};$('#gpsnote').textContent=`GPS: ±${Math.round(gps.acc)} m`;
   drawGPS();
   update(false)},e=>{$('#gpsnote').textContent='GPS: '+e.message+' (allow location in Settings › Safari)'},{enableHighAccuracy:true,maximumAge:5000})}
 function drawGPS(){if(map&&gps){if(!gpsM){gpsM=L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#fff',weight:3,fillColor:'#1e7cf2',fillOpacity:1}).addTo(map);acc=L.circle([gps.lat,gps.lng],{radius:gps.acc,color:'#1e7cf2',weight:1,fillOpacity:.1}).addTo(map)}else{gpsM.setLatLng([gps.lat,gps.lng]);acc.setLatLng([gps.lat,gps.lng]).setRadius(gps.acc)}}}
-function onOrient(e){let h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?360-e.alpha:null);if(h!=null){heading=h;update(false)}}
+function onOrient(e){let h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?360-e.alpha:null);if(h==null)return;const so=(screen.orientation&&screen.orientation.angle)||window.orientation||0;heading=(h+so+360)%360;if(!onOrient.p){onOrient.p=1;requestAnimationFrame(()=>{onOrient.p=0;drawArrow()})}}
 $('#compass').onclick=async()=>{try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw 0}
  window.addEventListener('deviceorientationabsolute',onOrient);window.addEventListener('deviceorientation',onOrient);$('#compass').textContent='🧭 Compass on'}catch(_){$('#compass').textContent='Compass unavailable'}};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
 $('#q').oninput=renderList;$('#list').onclick=e=>{const b=e.target.closest('.go');if(b)setDst(b.dataset.id)};
-$('#src').onchange=$('#dst').onchange=()=>update(true);$('#showroute').onclick=()=>show('map');
-$('#swap').onclick=()=>{const s=$('#src').value,d=$('#dst').value;if(!d)return;$('#src').value=d;$('#dst').value=s==='__gps'?'':s;update(true)};
+$('#src').onchange=$('#dst').onchange=()=>{lastGpsKey='';update(true)};$('#showroute').onclick=()=>show('map');
+$('#swap').onclick=()=>{const s=$('#src').value,d=$('#dst').value;if(!d)return;$('#src').value=d;$('#dst').value=s==='__gps'?'':s;lastGpsKey='';update(true)};
 const CH=[['all','All'],['now','On now / soon'],['timed','Shows & sessions'],['free','Free']];
 $('#chips').innerHTML=CH.map(([k,n])=>`<button class="chip${k==='all'?' on':''}" data-f="${k}">${n}</button>`).join('');
 $('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.f;document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b));renderList()};
 function fit(){document.documentElement.style.setProperty('--top',(document.querySelector('header').offsetHeight+$('#banner').offsetHeight)+'px')}
-fetch('data.json').then(r=>r.json()).then(d=>{D=d;fillSelects();renderList();fit();startGPS();setInterval(()=>{renderList();},60000)});
-addEventListener('resize',fit);
+fetch('graph.json').then(r=>r.json()).then(g=>{G=g;lastGpsKey='';update(false)}).catch(()=>{});
+fetch('data.json').then(r=>r.json()).then(d=>{D=d;$('#mappdf').href=d.mapPdf;fillSelects();renderList();fit();startGPS();setInterval(()=>{renderList();},60000)});
+addEventListener('resize',fit);if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
