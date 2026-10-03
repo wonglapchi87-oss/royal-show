@@ -1,0 +1,139 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Royal Show">
+<meta name="theme-color" content="#b3122e"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon.svg">
+<title>Perth Royal Show – Today</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:-apple-system,system-ui,sans-serif;background:#f4f4f6;color:#1c1c1e}
+header{background:#b3122e;color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px}
+header h1{margin:0;font-size:19px}header .sub{font-size:13px;opacity:.9}
+.banner{background:#fff3cd;color:#664d03;font-size:12px;padding:6px 16px}
+main{position:absolute;top:var(--top,100px);bottom:calc(64px + env(safe-area-inset-bottom));left:0;right:0;overflow:auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid #ddd;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;height:64px;border:0;background:none;font-size:13px;color:#666}nav button b{display:block;font-size:22px}
+nav button.on{color:#b3122e;font-weight:600}
+.view{display:none;padding:12px}.view.on{display:block}#v-map.on{padding:0;height:100%;display:flex;flex-direction:column}
+input[type=search],select{width:100%;font-size:17px;padding:12px;border:1px solid #ccc;border-radius:12px;background:#fff}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0}.chip{flex:none;padding:9px 14px;border-radius:20px;border:1px solid #ccc;background:#fff;font-size:15px}
+.chip.on{background:#b3122e;color:#fff;border-color:#b3122e}
+.ev{background:#fff;border-radius:14px;padding:12px 14px;margin:8px 0;box-shadow:0 1px 2px #0001;border-left:5px solid transparent}
+.ev.now{border-left-color:#1a9e45}.ev.next{border-left-color:#f0a000}.ev.past{opacity:.5}
+.ev .t{font-weight:600;font-size:16px}.ev .m{font-size:14px;color:#555;margin-top:3px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;margin-right:6px;color:#fff}
+.b-now{background:#1a9e45}.b-next{background:#f0a000}
+.ev .go{margin-top:8px;font-size:15px;padding:10px 12px;border:0;border-radius:10px;background:#eef;color:#2238a8;font-weight:600}
+.sec{font-size:13px;font-weight:700;color:#888;text-transform:uppercase;margin:16px 4px 4px}
+label{display:block;font-weight:600;margin:14px 2px 6px}
+.big{display:block;width:100%;font-size:17px;padding:15px;border:0;border-radius:14px;background:#b3122e;color:#fff;font-weight:600;margin-top:16px}
+.big.alt{background:#fff;color:#b3122e;border:2px solid #b3122e}
+#map{flex:1;min-height:200px}
+.panel{background:#fff;padding:12px 14px;border-top:1px solid #ddd}
+.dir{display:flex;align-items:center;gap:14px}
+#arrow{width:64px;height:64px;flex:none;transition:transform .2s}
+.dir .txt{font-size:18px;font-weight:600}.dir .s{font-size:14px;color:#555;font-weight:400}
+.row{display:flex;gap:8px;margin-top:10px}.row button,.row a{flex:1;text-align:center;text-decoration:none;font-size:15px;padding:12px 6px;border-radius:12px;border:0;background:#2238a8;color:#fff;font-weight:600}
+.row .alt{background:#eee;color:#222}
+.note{font-size:12px;color:#777;margin-top:8px}
+</style></head><body>
+<header><h1>🎡 Perth Royal Show – Today</h1><div class="sub" id="clock">Sat 3 Oct 2026 · Claremont Showground</div></header>
+<div class="banner" id="banner">Preview build: event list is real (RAS website); some locations are SAMPLE / approx.</div>
+<main id="main">
+<section class="view on" id="v-events">
+ <input type="search" id="q" placeholder="Search events or venues…">
+ <div class="chips" id="chips"></div>
+ <div id="list"></div>
+</section>
+<section class="view" id="v-route">
+ <label for="src">From</label><select id="src"></select>
+ <label for="dst">To</label><select id="dst"></select>
+ <button class="big" id="swap" style="background:#555">⇅ Swap</button>
+ <button class="big" id="showroute">Show route on map</button>
+ <p class="note">Tip: tap “Go here” on any event to set it as your destination. Locations marked (approx.) are not exact.</p>
+</section>
+<section class="view" id="v-map">
+ <div id="map"></div>
+ <div class="panel">
+  <div class="dir"><svg id="arrow" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#eef"/><path d="M32 6 L46 44 L32 36 L18 44 Z" fill="#2238a8"/></svg>
+   <div><div class="txt" id="dirtxt">Choose a destination</div><div class="s" id="dirsub"></div></div></div>
+  <div class="row"><button id="compass" class="alt">🧭 Use compass</button><a id="gmaps" href="#" target="_blank" rel="noopener">Google Maps walk</a></div>
+  <div class="note" id="gpsnote">GPS: waiting…</div>
+ </div>
+</section>
+</main>
+<nav><button data-v="events" class="on"><b>📅</b>Events</button><button data-v="route"><b>📍</b>From / To</button><button data-v="map"><b>🗺️</b>Map</button></nav>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const TZ='Australia/Perth';let D,map,gps=null,heading=null,srcM,dstM,line,gpsM,acc,filter='all';
+const $=s=>document.querySelector(s);
+function perthNow(){const p=new Intl.DateTimeFormat('en-AU',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const g=t=>p.find(x=>x.type==t).value;return{date:`${g('year')}-${g('month')}-${g('day')}`,min:+g('hour')*60+ +g('minute')}}
+const toMin=t=>{const[a,b]=t.split(':');return a*60+ +b};
+const fmt=t=>{let[h,m]=t.split(':').map(Number);const ap=h>=12?'pm':'am';h=h%12||12;return h+(m?':'+String(m).padStart(2,'0'):'')+ap};
+function status(e,now){if(now.date!==D.date)return{s:'',k:9999};let best=null;
+ for(const x of e.sessions){const a=toMin(x.start),b=toMin(x.end);if(now.min>=a&&now.min<b)return{s:'now',k:a,next:x};if(a>now.min&&(!best||a<toMin(best.start)))best=x}
+ if(best)return{s:toMin(best.start)-now.min<=60?'next':'later',k:toMin(best.start),next:best};return{s:'past',k:99999}}
+function loc(id){return D.locations.find(l=>l.id===id)}
+function lname(l){return l.name+(l.approx?' (approx.)':'')}
+function renderList(){const q=$('#q').value.toLowerCase(),now=perthNow();
+ let ev=D.events.filter(e=>(!q||(e.title+' '+e.venue+' '+e.summary).toLowerCase().includes(q)));
+ ev=ev.map(e=>({e,st:status(e,now)}));
+ if(filter==='now')ev=ev.filter(x=>x.st.s==='now'||x.st.s==='next');
+ if(filter==='timed')ev=ev.filter(x=>x.e.sessions.some(s=>toMin(s.end)-toMin(s.start)<=120));
+ if(filter==='free')ev=ev.filter(x=>x.e.free);
+ const ord={now:0,next:1,later:2,'':2,past:3};
+ ev.sort((a,b)=>(ord[a.st.s]-ord[b.st.s])||(a.st.k-b.st.k)||toMin(a.e.sessions[0]?.start||'0:0')-toMin(b.e.sessions[0]?.start||'0:0'));
+ let h='',last='';for(const{e,st}of ev){const sec={now:'On now',next:'Starting within the hour',later:'Later today',past:'Finished',' ':''}[st.s]||'Today';
+  if(sec!==last){h+=`<div class="sec">${sec}</div>`;last=sec}
+  const l=e.venueId&&loc(e.venueId);
+  h+=`<div class="ev ${st.s}"><div class="t">${st.s==='now'?'<span class="badge b-now">NOW</span>':st.s==='next'?'<span class="badge b-next">SOON</span>':''}${esc(e.title)}</div>
+  <div class="m">🕒 ${e.sessions.map(s=>fmt(s.start)+'–'+fmt(s.end)).join(', ')}</div>
+  <div class="m">📍 ${esc(l?lname(l):e.venue+(e.venue==='TBA'?'':' (location unknown)'))}${e.free?' · Free':''}</div>
+  ${l?`<button class="go" data-id="${esc(l.id)}">➜ Go here</button>`:''}</div>`}
+ $('#list').innerHTML=h||'<p>No matching events.</p>'}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function fillSelects(){const groups={venue:'Venues & pavilions',gate:'Gates',station:'Train',toilet:'Toilets',food:'Food',parking:'Parking'};
+ const opts=Object.entries(groups).map(([t,n])=>`<optgroup label="${n}">`+D.locations.filter(l=>l.type===t).sort((a,b)=>a.name.localeCompare(b.name)).map(l=>`<option value="${esc(l.id)}">${esc(lname(l))}</option>`).join('')+'</optgroup>').join('');
+ $('#src').innerHTML='<option value="__gps">📡 My current location (GPS)</option>'+opts;$('#dst').innerHTML='<option value="">— choose destination —</option>'+opts}
+function show(v){document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));if(v==='map'){initMap();setTimeout(()=>{map.invalidateSize();update(true)},50)}}
+function initMap(){if(map)return;map=L.map('map',{zoomControl:true}).setView([-31.9750,115.7855],17);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+ D.locations.forEach(l=>L.circleMarker([l.lat,l.lng],{radius:5,color:l.approx?'#f0a000':'#b3122e',weight:2,fillOpacity:.6}).addTo(map).bindPopup(esc(lname(l))+`<br><a href="#" onclick="setDst('${l.id.replace(/'/g,"\\'")}');return false">Go here</a>`));drawGPS()}
+function srcPt(){const v=$('#src').value;if(v==='__gps')return gps?{lat:gps.lat,lng:gps.lng,name:'You'}:null;const l=loc(v);return l&&{lat:l.lat,lng:l.lng,name:lname(l)}}
+function dstPt(){const l=loc($('#dst').value);return l&&{lat:l.lat,lng:l.lng,name:lname(l)}}
+const R=6371000,rad=x=>x*Math.PI/180;
+function dist(a,b){const dl=rad(b.lat-a.lat),dn=rad(b.lng-a.lng),h=Math.sin(dl/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function bearing(a,b){const y=Math.sin(rad(b.lng-a.lng))*Math.cos(rad(b.lat)),x=Math.cos(rad(a.lat))*Math.sin(rad(b.lat))-Math.sin(rad(a.lat))*Math.cos(rad(b.lat))*Math.cos(rad(b.lng-a.lng));return(Math.atan2(y,x)*180/Math.PI+360)%360}
+const card=b=>['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round(b/45)%8];
+function update(fit){if(!map)return;const a=srcPt(),b=dstPt();
+ [srcM,dstM,line].forEach(m=>m&&map.removeLayer(m));srcM=dstM=line=null;
+ if(a&&$('#src').value!=='__gps')srcM=L.marker([a.lat,a.lng],{title:'From'}).addTo(map).bindTooltip('From: '+esc(a.name));
+ if(b)dstM=L.marker([b.lat,b.lng],{title:'To'}).addTo(map).bindTooltip('To: '+esc(b.name),{permanent:true,direction:'top'});
+ if(a&&b){line=L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#2238a8',weight:5,dashArray:'8 8'}).addTo(map);
+  const d=dist(a,b),br=bearing(a,b),mins=Math.max(1,Math.round(d/1.25/60));
+  $('#dirtxt').textContent=d<15?'You have arrived 🎉':`Head ${card(br)}, about ${d<1000?Math.round(d/10)*10+' m':(d/1000).toFixed(1)+' km'}`;
+  $('#dirsub').textContent=`~${mins} min walk · to ${b.name} · straight line`;
+  $('#arrow').style.transform=`rotate(${heading==null?br:br-heading}deg)`;
+  $('#gmaps').href=`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}&travelmode=walking`;
+  if(fit)map.fitBounds(line.getBounds(),{padding:[50,50],maxZoom:18})}
+ else{$('#dirtxt').textContent=b?'Waiting for your GPS location…':'Choose a destination';$('#dirsub').textContent=b?'Or pick a starting point under From / To':'';$('#gmaps').href=b?`https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=walking`:'#'}}
+function setDst(id){$('#dst').value=id;show('map')}
+window.setDst=setDst;
+function startGPS(){if(!navigator.geolocation){$('#gpsnote').textContent='GPS not available';return}
+ navigator.geolocation.watchPosition(p=>{gps={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};$('#gpsnote').textContent=`GPS: ±${Math.round(gps.acc)} m`;
+  drawGPS();
+  update(false)},e=>{$('#gpsnote').textContent='GPS: '+e.message+' (allow location in Settings › Safari)'},{enableHighAccuracy:true,maximumAge:5000})}
+function drawGPS(){if(map&&gps){if(!gpsM){gpsM=L.circleMarker([gps.lat,gps.lng],{radius:9,color:'#fff',weight:3,fillColor:'#1e7cf2',fillOpacity:1}).addTo(map);acc=L.circle([gps.lat,gps.lng],{radius:gps.acc,color:'#1e7cf2',weight:1,fillOpacity:.1}).addTo(map)}else{gpsM.setLatLng([gps.lat,gps.lng]);acc.setLatLng([gps.lat,gps.lng]).setRadius(gps.acc)}}}
+function onOrient(e){let h=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?360-e.alpha:null);if(h!=null){heading=h;update(false)}}
+$('#compass').onclick=async()=>{try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){const r=await DeviceOrientationEvent.requestPermission();if(r!=='granted')throw 0}
+ window.addEventListener('deviceorientationabsolute',onOrient);window.addEventListener('deviceorientation',onOrient);$('#compass').textContent='🧭 Compass on'}catch(_){$('#compass').textContent='Compass unavailable'}};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+$('#q').oninput=renderList;$('#list').onclick=e=>{const b=e.target.closest('.go');if(b)setDst(b.dataset.id)};
+$('#src').onchange=$('#dst').onchange=()=>update(true);$('#showroute').onclick=()=>show('map');
+$('#swap').onclick=()=>{const s=$('#src').value,d=$('#dst').value;if(!d)return;$('#src').value=d;$('#dst').value=s==='__gps'?'':s;update(true)};
+const CH=[['all','All'],['now','On now / soon'],['timed','Shows & sessions'],['free','Free']];
+$('#chips').innerHTML=CH.map(([k,n])=>`<button class="chip${k==='all'?' on':''}" data-f="${k}">${n}</button>`).join('');
+$('#chips').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;filter=b.dataset.f;document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b));renderList()};
+function fit(){document.documentElement.style.setProperty('--top',(document.querySelector('header').offsetHeight+$('#banner').offsetHeight)+'px')}
+fetch('data.json').then(r=>r.json()).then(d=>{D=d;fillSelects();renderList();fit();startGPS();setInterval(()=>{renderList();},60000)});
+addEventListener('resize',fit);
+</script></body></html>
